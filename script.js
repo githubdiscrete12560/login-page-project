@@ -1,5 +1,5 @@
 // Configuration
-const API_BASE_URL = 'https://your-railway-app.railway.app'; // Replace with your Railway URL
+const API_BASE_URL = 'https://login-page-project-production.up.railway.app'; // Replace with your Railway URL
 
 // DOM Elements
 const loginForm = document.getElementById('loginForm');
