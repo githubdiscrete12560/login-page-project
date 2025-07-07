@@ -1,22 +1,39 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
-from auth import AuthManager
-from config import Config
 
 app = Flask(__name__)
-app.config.from_object(Config)
 CORS(app)
-
-# Initialize auth manager
-auth_manager = AuthManager()
 
 @app.route('/')
 def health_check():
-    return jsonify({"status": "healthy", "message": "API is running"})
+    # Debug environment variables
+    return jsonify({
+        "status": "healthy",
+        "message": "API is running",
+        "environment_check": {
+            "SUPABASE_URL": "✅ Set" if os.environ.get('SUPABASE_URL') else "❌ Missing",
+            "SUPABASE_KEY": "✅ Set" if os.environ.get('SUPABASE_KEY') else "❌ Missing",
+            "SECRET_KEY": "✅ Set" if os.environ.get('SECRET_KEY') else "❌ Missing",
+            "JWT_SECRET": "✅ Set" if os.environ.get('JWT_SECRET') else "❌ Missing"
+        },
+        "supabase_url_preview": os.environ.get('SUPABASE_URL', 'NOT SET')[:50] + "..." if os.environ.get('SUPABASE_URL') else "NOT SET"
+    })
+
+# Safer import with error handling
+try:
+    from auth import AuthManager
+    auth_manager = AuthManager()
+    print("✅ AuthManager initialized successfully")
+except Exception as e:
+    print(f"❌ AuthManager initialization failed: {e}")
+    auth_manager = None
 
 @app.route('/api/login', methods=['POST'])
 def login():
+    if not auth_manager:
+        return jsonify({"error": "Authentication service unavailable"}), 500
+    
     try:
         data = request.get_json()
         email = data.get('email')
@@ -25,6 +42,7 @@ def login():
         if not email or not password:
             return jsonify({"error": "Email and password required"}), 400
         
+        # Test authentication
         result = auth_manager.authenticate_user(email, password)
         
         if result['success']:
@@ -37,52 +55,8 @@ def login():
             return jsonify({"error": result['error']}), 401
             
     except Exception as e:
-        return jsonify({"error": "Internal server error"}), 500
-
-@app.route('/api/register', methods=['POST'])
-def register():
-    try:
-        data = request.get_json()
-        email = data.get('email')
-        password = data.get('password')
-        name = data.get('name')
-        
-        if not all([email, password, name]):
-            return jsonify({"error": "All fields required"}), 400
-        
-        result = auth_manager.register_user(email, password, name)
-        
-        if result['success']:
-            return jsonify({
-                "message": "Registration successful",
-                "user": result['user']
-            }), 201
-        else:
-            return jsonify({"error": result['error']}), 400
-            
-    except Exception as e:
-        return jsonify({"error": "Internal server error"}), 500
-
-@app.route('/api/verify-token', methods=['POST'])
-def verify_token():
-    try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({"error": "No token provided"}), 401
-        
-        token = auth_header.split(' ')[1]  # Bearer <token>
-        result = auth_manager.verify_token(token)
-        
-        if result['success']:
-            return jsonify({
-                "message": "Token valid",
-                "user": result['user']
-            }), 200
-        else:
-            return jsonify({"error": "Invalid token"}), 401
-            
-    except Exception as e:
-        return jsonify({"error": "Token verification failed"}), 401
+        print(f"Login error: {e}")
+        return jsonify({"error": f"Login failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
